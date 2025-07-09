@@ -1,0 +1,299 @@
+-- ============================================
+-- 🌐 MINI WORLD TELEPORT SYSTEM (FINAL W/ PERMISSION)
+-- ============================================
+
+local commandPrefix = "/"
+local commandList = {}
+local saved_locations = {}     -- Lokasi tersimpan per player
+local loopGotoID = {}          -- Loop teleport ke player
+local loopBring = {}           -- Bring loop
+local loopTpPairs = {}         -- Loop teleport antar pemain
+
+
+-- 🔍 Cek apakah punya izin
+local function hasTeleportPermission(pid)
+    local _, name = Player:getNickname(pid)
+    return PERMISSION_WHITELIST[name] == true
+end
+
+-- 🔍 Ambil UID dari nama pemain atau ID
+local function nametouid(name)
+    local _,_, list = World:getAllPlayers(-1)
+    for _, pid in ipairs(list) do
+        local _, nick = Player:getNickname(pid)
+        if nick == name or tostring(pid) == name then
+            return pid
+        end
+    end
+    return nil
+end
+
+-- 🔧 Registrasi command
+local function registerCommand(name, func)
+    commandList[name] = func
+end
+
+-- 🎯 Efek teleport
+local TP_EFFECT = 1001
+local TP_SOUND = 10963
+local function teleport(pid, x, y, z)
+    Actor:setPosition(pid, x, y, z)
+    World:playParticalEffect(x, y, z, TP_EFFECT, 1)
+    Player:playMusic(pid, TP_SOUND, 100, 1, false)
+end
+
+-- 🎯 Parser target (nama/ID/saved/coord/random)
+local function parseTarget(pidCaller, targetStr)
+    if not targetStr or targetStr == "" then
+        Chat:sendSystemMsg("⚠ Format salah atau target kosong!", pidCaller)
+        return nil
+    end
+    if targetStr == "random" then
+        local _,_, list = World:getAllPlayers(-1)
+        return list[math.random(#list)]
+    end
+    local p = nametouid(targetStr)
+    if p then return p end
+    local sx, sy, sz = targetStr:match("^(%-?[%d%.]+)%s+(%-?[%d%.]+)%s+(%-?[%d%.]+)$")
+    if sx then
+        return {x = tonumber(sx), y = tonumber(sy), z = tonumber(sz)}
+    end
+    if saved_locations[pidCaller] and saved_locations[pidCaller][targetStr] then
+        return saved_locations[pidCaller][targetStr]
+    end
+    Chat:sendSystemMsg("❌ Target tidak ditemukan: " .. targetStr, pidCaller)
+    return nil
+end
+
+-- 📦 GOTO COMMAND
+registerCommand("goto", function(pid, arg)
+    if not hasTeleportPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin teleport.", pid)
+        return
+    end
+    local t = parseTarget(pid, arg)
+    if not t then return end
+    if type(t) == "table" then
+        teleport(pid, t.x, t.y, t.z)
+    else
+        local _, x, y, z = Actor:getPosition(t)
+        teleport(pid, x, y, z)
+    end
+end)
+
+-- 📦 TPALL
+registerCommand("tpall", function(pid, arg)
+    if not hasTeleportPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin teleport.", pid)
+        return
+    end
+    if arg == "creature" then
+        Chat:sendSystemMsg("❌ Perintah /tpall creature tidak didukung.", pid)
+        return
+    end
+    local t = parseTarget(pid, arg)
+    if not t then return end
+    local _,_, list = World:getAllPlayers(-1)
+    for _, p in ipairs(list) do
+        if type(t) == "table" then
+            teleport(p, t.x, t.y, t.z)
+        else
+            local _, x, y, z = Actor:getPosition(t)
+            teleport(p, x, y, z)
+        end
+    end
+end)
+
+-- ♻️ LOOP GOTO
+registerCommand("loopgoto", function(pid, arg)
+    if not hasTeleportPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin loop teleport.", pid)
+        return
+    end
+    local targetPid = nametouid(arg or "")
+    if targetPid then loopGotoID[pid] = targetPid end
+end)
+
+registerCommand("unloopgoto", function(pid)
+    loopGotoID[pid] = nil
+end)
+
+-- ♻️ LOOP BRING
+registerCommand("bring", function(pid, arg)
+    if not hasTeleportPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin bring.", pid)
+        return
+    end
+    if arg == "all" then
+        loopBring[pid] = {all = true}
+    else
+        local t = nametouid(arg or "")
+        if t then loopBring[pid] = {all = false, target = t} end
+    end
+end)
+
+registerCommand("unbring", function(pid)
+    loopBring[pid] = nil
+end)
+
+-- 🔁 LOOPTP
+registerCommand("looptp", function(pid, arg)
+    if not hasTeleportPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin looptp.", pid)
+        return
+    end
+    local srcStr, tgtStr = arg:match("^(%S+)%s+(.+)$")
+    local srcList = {}
+
+    if srcStr == "all" then
+        local _,_, players = World:getAllPlayers(-1)
+        srcList = players
+    else
+        local uid = nametouid(srcStr)
+        if uid then table.insert(srcList, uid) end
+    end
+
+    local tgtPid = nametouid(tgtStr)
+    if not tgtPid then
+        Chat:sendSystemMsg("❌ Target tidak ditemukan.", pid)
+        return
+    end
+
+    for _, sid in ipairs(srcList) do
+        loopTpPairs[sid] = tgtPid
+    end
+    Chat:sendSystemMsg("🔁 Loop teleport aktif.", pid)
+end)
+
+registerCommand("unlooptp", function(pid)
+    if not hasTeleportPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin unlooptp.", pid)
+        return
+    end
+    for sid, _ in pairs(loopTpPairs) do
+        if sid == pid then
+            loopTpPairs[sid] = nil
+        end
+    end
+    Chat:sendSystemMsg("⛔ Loop teleport dihentikan.", pid)
+end)
+
+-- 🔁 /tp [source] [target]
+registerCommand("tp", function(pid, arg)
+    if not hasTeleportPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin teleport.", pid)
+        return
+    end
+    local from, to = arg:match("^(%S+)%s+(.+)$")
+    local src = from == "me" and pid or nametouid(from)
+    local tgt = parseTarget(pid, to)
+    if src and tgt then
+        if type(tgt) == "table" then
+            teleport(src, tgt.x, tgt.y, tgt.z)
+        else
+            local _, x, y, z = Actor:getPosition(tgt)
+            teleport(src, x, y, z)
+        end
+    end
+end)
+
+-- 💾 Save lokasi
+registerCommand("tpsv", function(pid, arg)
+    if not hasTeleportPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin menyimpan lokasi.", pid)
+        return
+    end
+    local ok, x, y, z = Actor:getPosition(pid)
+    if ok == ErrorCode.OK then
+        saved_locations[pid] = saved_locations[pid] or {}
+        saved_locations[pid][arg] = {x = x, y = y, z = z}
+        Chat:sendSystemMsg("💾 Lokasi '" .. arg .. "' disimpan.", pid)
+    end
+end)
+
+-- 📍 Goto lokasi tersimpan
+registerCommand("gototpsv", function(pid, arg)
+    if not hasTeleportPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin.", pid)
+        return
+    end
+    if saved_locations[pid] and saved_locations[pid][arg] then
+        local pos = saved_locations[pid][arg]
+        teleport(pid, pos.x, pos.y, pos.z)
+    else
+        Chat:sendSystemMsg("❌ Lokasi tidak ditemukan!", pid)
+    end
+end)
+
+-- 📋 List lokasi
+registerCommand("listtpsv", function(pid)
+    if not hasTeleportPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin.", pid)
+        return
+    end
+    Chat:sendSystemMsg("📋 Lokasi tersimpan:", pid)
+    if saved_locations[pid] then
+        for name, pos in pairs(saved_locations[pid]) do
+            Chat:sendSystemMsg("• " .. name .. " → X:" .. pos.x .. " Y:" .. pos.y .. " Z:" .. pos.z, pid)
+        end
+    else
+        Chat:sendSystemMsg("(kosong)", pid)
+    end
+end)
+
+-- 📘 Bantuan
+registerCommand("tphelp", function(pid)
+    Chat:sendSystemMsg("📘 === TP COMMAND HELP ===", pid)
+    Chat:sendSystemMsg("/goto [target]          → Teleport ke target", pid)
+    Chat:sendSystemMsg("/tpall [target]         → Teleport semua ke target", pid)
+    Chat:sendSystemMsg("/loopgoto [player]      → Loop teleport ke pemain", pid)
+    Chat:sendSystemMsg("/unloopgoto             → Hentikan loopgoto", pid)
+    Chat:sendSystemMsg("/bring [player/all]     → Tarik ke posisimu", pid)
+    Chat:sendSystemMsg("/unbring                → Hentikan bring", pid)
+    Chat:sendSystemMsg("/looptp [src] [target]  → Loop teleport src ke target", pid)
+    Chat:sendSystemMsg("/unlooptp               → Hentikan looptp", pid)
+    Chat:sendSystemMsg("/tp [src] [target]      → Teleport satu pemain ke target", pid)
+    Chat:sendSystemMsg("/tpsv [name]            → Simpan lokasi", pid)
+    Chat:sendSystemMsg("/gototpsv [name]        → Pergi ke lokasi tersimpan", pid)
+    Chat:sendSystemMsg("/listtpsv               → Daftar lokasi", pid)
+end)
+
+-- 🔁 Loop Tick Event
+ScriptSupportEvent:registerEvent("Game.Tick", function()
+    for me, pid in pairs(loopGotoID) do
+        if pid then
+            local _, x, y, z = Actor:getPosition(pid)
+            teleport(me, x, y, z)
+        end
+    end
+    for me, info in pairs(loopBring) do
+        if info.all then
+            local _, x, y, z = Actor:getPosition(me)
+            for _, p in ipairs(World:getAllPlayers(-1)) do
+                teleport(p, x, y, z)
+            end
+        elseif info.target then
+            local _, x, y, z = Actor:getPosition(me)
+            teleport(info.target, x, y, z)
+        end
+    end
+    for src, tgt in pairs(loopTpPairs) do
+        if tgt then
+            local _, x, y, z = Actor:getPosition(tgt)
+            teleport(src, x, y, z)
+        end
+    end
+end)
+
+-- 📥 Chat Parser
+ScriptSupportEvent:registerEvent("Player.NewInputContent", function(event)
+    local pid = event.eventobjid
+    local msg = event.content
+    for name, func in pairs(commandList) do
+        if msg:match("^/" .. name) then
+            local _, _, arg = msg:find("^/" .. name .. "%s*(.*)")
+            func(pid, arg)
+            return
+        end
+    end
+end)
