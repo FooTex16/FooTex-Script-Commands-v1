@@ -1,11 +1,13 @@
 Tutorial Instalations https://youtu.be/3cwxkhdZtgY
 
-[ Database ItemID MiniWorld 2025 ] https://github.com/FooTex16/MiniWorld-Tools/releases/tag/Data
+[ Database ItemID MiniWorld 2025 ] https://github.com/FooTex16/FooTex-Script-Commands-v1/releases/tag/data
 
-[ Commands List ] https://github.com/FooTex16/MiniWorld-Tools/blob/main/Commands
+[ Commands List ] https://github.com/FooTex16/FooTex-Script-Commands-v1/blob/main/prompt_commands
 
-Pastebin link [TP Commands Script ] https://pastebin.com/799AgKvJ
+Script:
 
-[Attribute Commands Script ] https://pastebin.com/xPnp46tf
+[ Tp Commands ] https://github.com/FooTex16/FooTex-Script-Commands-v1/blob/main/tp_commands
 
-[ Give System Commands Script ] https://pastebin.com/igWLyeuy
+[Attribute Commands Script ] https://github.com/FooTex16/FooTex-Script-Commands-v1/blob/main/attribute_commands
+
+[ Give System Commands Script ] https://github.com/FooTex16/FooTex-Script-Commands-v1/blob/main/give_commands
