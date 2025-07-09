@@ -1,0 +1,132 @@
+-- =============================================
+-- 🔐 ADMIN + PERMISSION SYSTEM (FINAL VERSION)
+-- =============================================
+
+-- ✅ Daftar pemain dengan izin tetap (whitelist)
+PERMISSION_WHITELIST = {
+    ["Player1"] = true, --Your Player Name
+}
+
+MAX_GIVE = 99
+commandPrefix = "/"
+commandList = {}
+givePermission = {}
+
+-- 🔍 Fungsi: nama → UID
+function nametouid(name)
+    local _, _, list = World:getAllPlayers(-1)
+    for _, pid in ipairs(list) do
+        local _, nick = Player:getNickname(pid)
+        if nick == name then
+            return pid
+        end
+    end
+    return nil
+end
+
+-- 🏆 Cek apakah host (fallback: PID terkecil)
+function isHost(pid)
+    if Player.isHost then
+        return Player:isHost(pid) == true
+    end
+    local _, _, list = World:getAllPlayers(-1)
+    local minPid = nil
+    for _, p in ipairs(list) do
+        if not minPid or p < minPid then minPid = p end
+    end
+    return pid == minPid
+end
+
+-- 🔐 Cek apakah punya izin
+function hasGivePermission(pid)
+    local _, name = Player:getNickname(pid)
+    return isHost(pid) or givePermission[pid] or PERMISSION_WHITELIST[name] == true
+end
+
+-- 🔧 Daftarkan command
+function registerCommand(name, func)
+    commandList[name] = func
+end
+
+-- =============================================
+-- 📜 COMMANDS: GRANT / REVOKE / LIST / HOST
+-- =============================================
+
+registerCommand("grantgive", function(pid, target)
+    local _, name = Player:getNickname(pid)
+    if not (isHost(pid) or PERMISSION_WHITELIST[name]) then
+        Chat:sendSystemMsg("⛔ Hanya host atau whitelist yang bisa memberikan izin.", pid)
+        return
+    end
+    local tp = tonumber(target) or nametouid(target)
+    if not tp then
+        Chat:sendSystemMsg("❌ Target tidak ditemukan!", pid)
+        return
+    end
+    givePermission[tp] = true
+    Chat:sendSystemMsg("✅ Izin /give diberikan ke pemain.", pid)
+    Chat:sendSystemMsg("📜 Kamu sekarang memiliki izin /give.", tp)
+end)
+
+registerCommand("revoke", function(pid, target)
+    local _, name = Player:getNickname(pid)
+    if not (isHost(pid) or PERMISSION_WHITELIST[name]) then
+        Chat:sendSystemMsg("⛔ Hanya host atau whitelist yang bisa mencabut izin.", pid)
+        return
+    end
+    local tp = tonumber(target) or nametouid(target)
+    if not tp then
+        Chat:sendSystemMsg("❌ Target tidak ditemukan!", pid)
+        return
+    end
+    givePermission[tp] = nil
+    Chat:sendSystemMsg("⛔ Izin /give dicabut.", pid)
+    Chat:sendSystemMsg("❌ Kamu tidak lagi memiliki izin /give.", tp)
+end)
+
+registerCommand("listperm", function(pid)
+    Chat:sendSystemMsg("🧾 Pemain dengan izin /give:", pid)
+    for uid, _ in pairs(givePermission) do
+        local _, name = Player:getNickname(uid)
+        Chat:sendSystemMsg("✅ " .. name .. " (" .. uid .. ")", pid)
+    end
+    for name, _ in pairs(PERMISSION_WHITELIST) do
+        Chat:sendSystemMsg("🔒 Whitelist: " .. name, pid)
+    end
+end)
+
+registerCommand("amihost", function(pid)
+    if isHost(pid) then
+        Chat:sendSystemMsg("✅ Kamu adalah host!", pid)
+    else
+        Chat:sendSystemMsg("❌ Kamu BUKAN host.", pid)
+    end
+end)
+
+-- =============================================
+-- 💬 CHAT PARSER UNTUK COMMAND
+-- =============================================
+
+-- Kompatibilitas: jika Lua lama tidak punya `unpack`, pakai versi global
+if not unpack and table.unpack then
+    unpack = table.unpack
+end
+
+ScriptSupportEvent:registerEvent("Player.NewInputContent", function(event)
+    local pid = event.eventobjid
+    local msg = event.content
+
+    if msg:sub(1, 1) ~= "/" then return end -- hanya command
+
+    local args = {}
+    for word in msg:gmatch("%S+") do
+        table.insert(args, word)
+    end
+
+    local cmd = args[1]:sub(2):lower()
+    local func = commandList[cmd]
+    if func then
+        table.remove(args, 1)
+        func(pid, unpack(args)) -- ✅ fix error unpack
+    end
+end)
