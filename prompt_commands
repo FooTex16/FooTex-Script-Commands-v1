@@ -1,0 +1,77 @@
+🎮 Basic Attribute Control
+/sethp [nilai]             → Set HP saat ini              | Set current HP  
+/setmaxhp [nilai]          → Set maksimum HP             | Set max HP  
+/sethprec [nilai]          → Set regenerasi HP           | Set HP recovery rate  
+/sethunger [nilai]         → Set rasa lapar              | Set hunger level  
+/setoxygen [nilai]         → Set oksigen                 | Set oxygen level  
+/setsta [nilai]            → Set stamina saat ini        | Set current stamina  
+/setmaxsta [nilai]         → Set stamina maksimum        | Set max stamina  
+/setsrec [nilai]           → Set regenerasi stamina      | Set stamina recovery rate  
+/setatk [nilai]            → Set serangan melee          | Set melee attack  
+/setrangedatk [nilai]      → Set serangan jarak jauh     | Set ranged attack  
+/setdef [nilai]            → Set defense melee           | Set melee defense  
+/setrangeddef [nilai]      → Set defense ranged          | Set ranged defense  
+/setmodelsize [nilai]      → Ubah ukuran model pemain    | Set model scale  
+/setstar [nilai]           → Ubah jumlah bintang         | Set star count  
+/setcurlevelexp [nilai]    → Set EXP saat ini            | Set current level EXP  
+/setlevel [nilai]          → Set level pemain            | Set player level  
+/setspeed [nilai]          → Ubah kecepatan jalan        | Set move speed  
+/setrunspeed [nilai]       → Ubah kecepatan lari         | Set run speed  
+/setstealthspeed [nilai]   → Ubah kecepatan sembunyi     | Set stealth speed  
+/setswimspeed [nilai]      → Ubah kecepatan renang       | Set swim speed  
+/setjump [nilai]           → Ubah tinggi lompatan        | Set jump height  
+
+
+💾 Attribute Profile Management
+/attrsave [nama]           → Simpan profil atribut        | Save attribute profile  
+/attrload [nama]           → Muat profil atribut          | Load attribute profile  
+/attrprofile               → Daftar profil tersimpan      | List saved profiles  
+/attrreset                 → Reset semua atribut ke 0     | Reset all attributes 
+
+
+⚔️ Special Modes
+/attackontitan             → Aktifkan Titan Mode          | Enable Titan mode  
+/ultramangodmode           → Aktifkan God Mode            | Enable Ultraman God mode  
+/attackoff                 → Nonaktifkan Titan/God mode   | Disable special mode 
+
+
+🎁 Item Give Commands
+/give [itemID] [jumlah] ([target])   → Beri item ke target         | Give item  
+/giveall [itemID] [jumlah]           → Beri item ke semua pemain   | Give item to all  
+/clearinv [barType]                  → Kosongkan bar tertentu      | Clear inventory (1=Shortcut, 2=Storage, 3=Armor)  
+/givehelp                            → Tampilkan bantuan give      | Show give command help  
+
+
+✨ Permission Management
+/grantgive [nama/ID]                 → Beri izin /give             | Grant permission  
+/revoke [nama/ID]                    → Cabut izin /give            | Revoke permission  
+/listperm                            → Daftar pemain berizin       | List players with permission  
+/amihost                             → Cek apakah kamu host        | Check if you're host  
+
+
+🧭 Teleport Commands
+/goto [target]                       → Teleport ke target          | Teleport to target  
+/tpall [target]                      → Teleport semua ke target    | Teleport all players  
+/loopgoto [nama]                     → Loop teleport ke pemain     | Loop teleport  
+/unloopgoto                          → Hentikan loopgoto           | Stop loop teleport  
+/bring [nama/all]                    → Tarik pemain ke posisimu    | Bring player(s)  
+/unbring                             → Hentikan bring loop         | Stop bring  
+/looptp [src] [target]               → Loop tp dari src ke target  | Loop teleport src→target  
+/unlooptp                            → Hentikan looptp             | Stop looptp  
+/tp [src] [target]                   → Tp satu pemain ke target    | Teleport player to target  
+
+
+💾 Saved Locations
+/tpsv [nama]                         → Simpan lokasi saat ini      | Save current location  
+/gototpsv [nama]                     → Pergi ke lokasi tersimpan   | Go to saved location  
+/listtpsv                            → Lihat daftar lokasi         | List saved locations  
+
+
+📘 Bantuan
+/tphelp                              → Bantuan teleportasi         | Show TP command help  
+/attrhelp                            → Bantuan atribut             | Show attribute help  
+
+
+
+
+
