@@ -49,7 +49,8 @@
 /grantgive [nama/ID]                 → Beri izin /give             | Grant permission  
 /revoke [nama/ID]                    → Cabut izin /give            | Revoke permission  
 /listperm                            → Daftar pemain berizin       | List players with permission  
-/amihost                             → Cek apakah kamu host        | Check if you're host  
+/amihost                             → Cek apakah kamu host        | Check if you're host
+/listplayer                          → Lihat list player di game   | See player active in room
 
 
 🧭 Teleport Commands
