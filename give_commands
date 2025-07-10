@@ -2,15 +2,14 @@
 -- 🎮 MINI WORLD GIVE ITEM SYSTEM (WITH PERMISSION)
 -- =============================================
 
-
 -- Maksimal jumlah item per pemberian
 local MAX_GIVE = 99
 
--- Prefix command (chat)
+-- Prefix command
 local commandPrefix = "/"
 local commandList = {}
 
--- 🔍 Ambil UID dari nama pemain
+-- 🔍 Ambil UID dari nama pemain atau angka langsung
 local function nametouid(name)
     local _, _, list = World:getAllPlayers(-1)
     for _, pid in ipairs(list) do
@@ -22,43 +21,50 @@ local function nametouid(name)
     return nil
 end
 
--- ✅ Cek izin pemain
+-- ✅ Fungsi cek izin pemain, baca dari admin_permission.lua
 local function hasGivePermission(pid)
-    local _, name = Player:getNickname(pid)
-    return PERMISSION_WHITELIST[name] == true
+    if isPermitted then
+        return isPermitted(pid)
+    else
+        local _, name = Player:getNickname(pid)
+        return PERMISSION_WHITELIST and PERMISSION_WHITELIST[name] == true
+    end
 end
 
--- 🔧 Daftar command
+-- 🔧 Daftarkan command
 local function registerCommand(name, func)
     commandList[name] = func
 end
 
--- ============================
--- 📦 GIVE ITEM COMMAND SYSTEM
--- ============================
+-- =============================================
+-- 📦 GIVE ITEM TO PLAYER
+-- =============================================
 
--- Beri item ke diri sendiri atau orang lain
 registerCommand("give", function(pid, itemid, qty, target)
     if not hasGivePermission(pid) then
         Chat:sendSystemMsg("🚫 Kamu tidak punya izin menggunakan /give.", pid)
         return
     end
+
     itemid = tonumber(itemid)
     qty = math.min(tonumber(qty) or 1, MAX_GIVE)
     if not itemid or qty < 1 then
         Chat:sendSystemMsg("⚠ Format: /give [itemID] [jumlah] ([target])", pid)
         return
     end
+
     local name = Item:getItemName(itemid)
     if not name then
         Chat:sendSystemMsg("❌ ID item tidak valid!", pid)
         return
     end
+
     local tp = target and (tonumber(target) or nametouid(target)) or pid
     if not tp then
         Chat:sendSystemMsg("❌ Target tidak ditemukan!", pid)
         return
     end
+
     local ok = Backpack:addItem(tp, itemid, qty)
     if ok then
         Chat:sendSystemMsg("🎁 Diberikan *" .. name .. "* x" .. qty, tp)
@@ -70,23 +76,29 @@ registerCommand("give", function(pid, itemid, qty, target)
     end
 end)
 
--- Beri item ke semua pemain
+-- =============================================
+-- 📦 GIVE ITEM TO ALL PLAYERS
+-- =============================================
+
 registerCommand("giveall", function(pid, itemid, qty)
     if not hasGivePermission(pid) then
         Chat:sendSystemMsg("🚫 Kamu tidak punya izin menggunakan /giveall.", pid)
         return
     end
+
     itemid = tonumber(itemid)
     qty = math.min(tonumber(qty) or 1, MAX_GIVE)
     if not itemid or qty < 1 then
         Chat:sendSystemMsg("⚠ Format: /giveall [itemID] [jumlah]", pid)
         return
     end
+
     local name = Item:getItemName(itemid)
     if not name then
         Chat:sendSystemMsg("❌ ID item tidak valid!", pid)
         return
     end
+
     local _, _, list = World:getAllPlayers(-1)
     for _, tpid in ipairs(list) do
         Backpack:addItem(tpid, itemid, qty)
@@ -95,48 +107,60 @@ registerCommand("giveall", function(pid, itemid, qty)
     Chat:sendSystemMsg("📢 *" .. name .. "* x" .. qty .. " diberikan ke semua pemain!", pid)
 end)
 
--- Kosongkan backpack
+-- =============================================
+-- 🧹 CLEAR PLAYER INVENTORY
+-- =============================================
+
 registerCommand("clearinv", function(pid, barType)
     if not hasGivePermission(pid) then
         Chat:sendSystemMsg("🚫 Kamu tidak punya izin menggunakan /clearinv.", pid)
         return
     end
+
     local bt = tonumber(barType)
     if not bt or bt < 1 or bt > 3 then
-        Chat:sendSystemMsg("⚠ Format: /clearinv [barType 1–3]\n1=Shortcut bar, 2=Storage bar, 3=Armor bar", pid)
+        Chat:sendSystemMsg("⚠ Format: /clearinv [barType 1–3]\n1=Shortcut, 2=Storage, 3=Armor", pid)
         return
     end
+
     local err = Backpack:clearPack(pid, bt)
     if err == ErrorCode.OK or err == 0 then
-        local nameBar = ({ "Shortcut bar", "Storage bar", "Armor bar" })[bt]
-        Chat:sendSystemMsg("🧹 " .. nameBar .. " kamu berhasil dikosongkan.", pid)
+        local nameBar = ({ "Shortcut", "Storage", "Armor" })[bt]
+        Chat:sendSystemMsg("🧹 " .. nameBar .. " bar kamu berhasil dikosongkan.", pid)
     else
         Chat:sendSystemMsg("⚠ Gagal mengosongkan bar! Kode error: " .. tostring(err), pid)
     end
 end)
 
--- Bantuan command
+-- =============================================
+-- 📘 HELP COMMAND
+-- =============================================
+
 registerCommand("givehelp", function(pid)
-    Chat:sendSystemMsg("📘 Daftar Perintah:", pid)
-    Chat:sendSystemMsg("/give [itemID] [qty]     → Beri item", pid)
-    Chat:sendSystemMsg("/giveall [itemID] [qty]  → Beri ke semua pemain", pid)
-    Chat:sendSystemMsg("/clearinv [barType]      → Kosongkan backpack", pid)
-    Chat:sendSystemMsg("/givehelp                → Tampilkan bantuan", pid)
+    Chat:sendSystemMsg("📘 Daftar Perintah Give System:", pid)
+    Chat:sendSystemMsg("/give [itemID] [qty] ([target]) → Beri item", pid)
+    Chat:sendSystemMsg("/giveall [itemID] [qty]        → Beri ke semua pemain", pid)
+    Chat:sendSystemMsg("/clearinv [1-3]                → Kosongkan bar", pid)
+    Chat:sendSystemMsg("/givehelp                      → Bantuan", pid)
 end)
 
--- ====================
--- 📥 CHAT EVENT HOOK
--- ====================
+-- =============================================
+-- 💬 CHAT EVENT HANDLER
+-- =============================================
+
 local function onPlayerMessage(event)
     local pid = event.eventobjid
     local msg = event.content
+
     if not msg:find("^" .. commandPrefix) then return end
+
     local _, parts = Game:splitStr(msg:sub(2), " ")
     local cmd = parts[1]:lower()
     local args = {}
     for i = 2, #parts do
         args[#args + 1] = parts[i]
     end
+
     local fn = commandList[cmd]
     if fn then fn(pid, unpack(args)) end
 end
