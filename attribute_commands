@@ -192,6 +192,16 @@ ScriptSupportEvent:registerEvent("Player.NewInputContent", function(event)
     elseif msg == "/attackoff" then
         disableOPMode(pid)
         return
+        
+    elseif msg == "/kill all" then
+        local _, _, list = World:getAllPlayers(-1)
+        for _, uid in ipairs(list) do
+            Player:setAttr(uid, PLAYERATTR.CUR_HP, 0)
+            Chat:sendSystemMsg("☠ Kamu dibunuh oleh admin.", uid)
+        end
+        Chat:sendSystemMsg("🔥 Semua pemain telah dibunuh.", pid)
+        return
+    
     end
 
     -- 🎯 /set[nama] [value] (target optional)
