@@ -3,8 +3,6 @@
 -- =============================================
 
 local savedAttr = {}
-
--- 🗺️ Pemetaan nama command ke atribut
 local attrMap = {
     sethp             = PLAYERATTR.CUR_HP,
     setmaxhp          = PLAYERATTR.MAX_HP,
@@ -29,8 +27,40 @@ local attrMap = {
     setjump           = PLAYERATTR.JUMP_HEIGHT
 }
 
+-- 🔍 Ambil UID dari nama pemain atau ID
+local function nametouid(name)
+    local _, _, list = World:getAllPlayers(-1)
+    local playerIndexMap = {}
+    for i, pid in ipairs(list) do
+        playerIndexMap[i] = pid
+    end
+
+    if name and name:match("^P%[(%d+)%]$") then
+        local idx = tonumber(name:match("^P%[(%d+)%]$"))
+        return playerIndexMap[idx]
+    end
+
+    for _, pid in ipairs(list) do
+        local _, nick = Player:getNickname(pid)
+        if nick == name or tostring(pid) == name then
+            return pid
+        end
+    end
+
+    return nil
+end
+
+
+-- 🔢 Pemetaan nomor ke pemain
+local function getPlayerByIndex(index)
+    index = tonumber(index)
+    local _, _, list = World:getAllPlayers(-1)
+    table.sort(list) -- urutkan biar konsisten
+    return list[index]
+end
+
 -- 💾 Simpan profil atribut
-function saveAttributesProfile(pid, name)
+local function saveAttributesProfile(pid, name)
     name = name or "default"
     savedAttr[pid] = savedAttr[pid] or {}
     savedAttr[pid][name] = {}
@@ -41,7 +71,7 @@ function saveAttributesProfile(pid, name)
 end
 
 -- 🔄 Muat profil atribut
-function loadAttributesProfile(pid, name)
+local function loadAttributesProfile(pid, name)
     name = name or "default"
     if not (savedAttr[pid] and savedAttr[pid][name]) then
         Chat:sendSystemMsg("#R✖ No saved profile: '" .. name .. "'", pid)
@@ -54,7 +84,7 @@ function loadAttributesProfile(pid, name)
 end
 
 -- 📜 Daftar profil
-function listProfiles(pid)
+local function listProfiles(pid)
     Chat:sendSystemMsg("#W📦 Your saved profiles:", pid)
     if not savedAttr[pid] then
         Chat:sendSystemMsg("  - None", pid)
@@ -66,31 +96,15 @@ function listProfiles(pid)
 end
 
 -- 🔁 Reset semua atribut
-function resetAttributes(pid)
+local function resetAttributes(pid)
     for _, attr in pairs(attrMap) do
         Player:setAttr(pid, attr, 0)
     end
     Chat:sendSystemMsg("#Y🔁 All attributes reset", pid)
 end
 
--- 📘 Bantuan
-function showAttrHelp(pid)
-    Chat:sendSystemMsg("#W📜 === Attribute Commands ===", pid)
-    for cmd, _ in pairs(attrMap) do
-        Chat:sendSystemMsg("/" .. cmd .. " [value]", pid)
-    end
-    Chat:sendSystemMsg("/attrsave [name]    → Save profile", pid)
-    Chat:sendSystemMsg("/attrload [name]    → Load profile", pid)
-    Chat:sendSystemMsg("/attrprofile        → List saved profiles", pid)
-    Chat:sendSystemMsg("/attrreset          → Reset all attributes", pid)
-    Chat:sendSystemMsg("/attackontitan      → Titan Mode", pid)
-    Chat:sendSystemMsg("/attackoff          → Restore last profile", pid)
-    Chat:sendSystemMsg("/ultramangodmode    → God Mode", pid)
-    Chat:sendSystemMsg("/set[nama] [val] [all/nama]", pid)
-end
-
 -- 🔥 Mode Titan
-function enableTitanMode(pid)
+local function enableTitanMode(pid)
     saveAttributesProfile(pid, "__prev_titan__")
     Player:setAttr(pid, PLAYERATTR.MAX_HP, 99999)
     Player:setAttr(pid, PLAYERATTR.CUR_HP, 99999)
@@ -114,7 +128,7 @@ function enableTitanMode(pid)
 end
 
 -- ⚡ Ultraman God Mode
-function enableUltraManGodMode(pid)
+local function enableUltraManGodMode(pid)
     saveAttributesProfile(pid, "__prev_god__")
     Player:setAttr(pid, PLAYERATTR.MAX_HP, 99999)
     Player:setAttr(pid, PLAYERATTR.CUR_HP, 99999)
@@ -137,40 +151,37 @@ function enableUltraManGodMode(pid)
     Chat:sendSystemMsg("#Y⚡ Ultraman God Mode activated!", pid)
 end
 
--- 🔙 Kembalikan ke mode semula
-function disableOPMode(pid)
+-- 🔙 Restore state
+local function disableOPMode(pid)
     loadAttributesProfile(pid, "__prev_titan__")
     loadAttributesProfile(pid, "__prev_god__")
     Chat:sendSystemMsg("#W👤 Restored to original state", pid)
 end
 
--- ✅ CEK IZIN + PARSER
-function onAttrChatInput(event)
+-- 🧠 Parser Input
+ScriptSupportEvent:registerEvent("Player.NewInputContent", function(event)
     local pid = event.eventobjid
     local msg = event.content
 
     if not hasGivePermission(pid) then
-        Chat:sendSystemMsg("⛔ Kamu tidak punya izin untuk menggunakan attribute command.", pid)
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin attribute.", pid)
         return
     end
 
-    -- ✅ Perintah-profil
-    if msg:match("^/attrsave%s*(%w*)") then
+    -- 📦 Command preset
+    if msg:match("^/attrsave") then
         local name = msg:match("^/attrsave%s*(%w*)")
         saveAttributesProfile(pid, name ~= "" and name or "default")
         return
-    elseif msg:match("^/attrload%s*(%w*)") then
+    elseif msg:match("^/attrload") then
         local name = msg:match("^/attrload%s*(%w*)")
         loadAttributesProfile(pid, name ~= "" and name or "default")
-        return
-    elseif msg == "/attrreset" then
-        resetAttributes(pid)
         return
     elseif msg == "/attrprofile" then
         listProfiles(pid)
         return
-    elseif msg == "/attrhelp" then
-        showAttrHelp(pid)
+    elseif msg == "/attrreset" then
+        resetAttributes(pid)
         return
     elseif msg == "/attackontitan" then
         enableTitanMode(pid)
@@ -183,33 +194,35 @@ function onAttrChatInput(event)
         return
     end
 
-    -- ✅ Perintah: /set[nama] [value] [target]
-    local cmd, valStr, targetName = msg:match("^/set(%w+)%s+(%d+)%s*(%w*)")
+    -- 🎯 /set[nama] [value] (target optional)
+    local cmd, valStr, targetStr = msg:match("^/set(%w+)%s+(%d+)%s*(%S*)")
     local attr = attrMap["set" .. cmd]
-    local val = tonumber(valStr)
+    local value = tonumber(valStr)
+    if not attr or not value then return end
 
-    if attr and val then
-        if targetName == "" then
-            Player:setAttr(pid, attr, val)
-            Chat:sendSystemMsg("#G✔ " .. cmd .. " set ke " .. val, pid)
-        elseif targetName:lower() == "all" then
-            local _, _, list = World:getAllPlayers(-1)
-            for _, uid in ipairs(list) do
-                Player:setAttr(uid, attr, val)
-                Chat:sendSystemMsg("#G✔ " .. cmd .. " semua pemain set ke " .. val, uid)
-            end
-        else
-            local targetPid = nametouid(targetName)
-            if targetPid then
-                Player:setAttr(targetPid, attr, val)
-                Chat:sendSystemMsg("#G✔ " .. cmd .. " pemain " .. targetName .. " set ke " .. val, targetPid)
-                Chat:sendSystemMsg("📤 Atribut " .. cmd .. " dikirim ke " .. targetName, pid)
-            else
-                Chat:sendSystemMsg("❌ Pemain '" .. targetName .. "' tidak ditemukan.", pid)
-            end
+    -- ✅ Target bisa kosong / "all" / nama / id / P[nomor]
+    local targetPid = nil
+
+    if targetStr == "" then
+        targetPid = pid
+    elseif targetStr == "all" then
+        local _, _, list = World:getAllPlayers(-1)
+        for _, uid in ipairs(list) do
+            Player:setAttr(uid, attr, value)
+            Chat:sendSystemMsg("✅ " .. cmd .. " semua pemain set ke " .. value, uid)
         end
         return
+    elseif targetStr:match("^P%[(%d+)%]$") then
+        local index = tonumber(targetStr:match("^P%[(%d+)%]$"))
+        targetPid = getPlayerByIndex(index)
+    else
+        targetPid = nametouid(targetStr)
     end
-end
 
-ScriptSupportEvent:registerEvent("Player.NewInputContent", onAttrChatInput)
+    if targetPid then
+        Player:setAttr(targetPid, attr, value)
+        Chat:sendSystemMsg("✅ " .. cmd .. " pemain diset ke " .. value, targetPid)
+    else
+        Chat:sendSystemMsg("❌ Target tidak ditemukan.", pid)
+    end
+end)
