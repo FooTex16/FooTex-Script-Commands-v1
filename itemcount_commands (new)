@@ -1,0 +1,104 @@
+-- ============================================
+-- 🎮 MINI WORLD: /removeitem dengan Permission
+-- ✅ Menghapus item aktif menggunakan API resmi
+-- ============================================
+
+-- Fix unpack untuk kompatibilitas Lua
+if not unpack and table.unpack then unpack = table.unpack end
+
+-- Prefix dan daftar command
+local commandPrefix = "/"
+local commandList = {}
+
+-- Fungsi cek izin (gunakan whitelist global)
+local function hasPermission(pid)
+    local _, name = Player:getNickname(pid)
+    return PERMISSION_WHITELIST and PERMISSION_WHITELIST[name]
+end
+
+-- Pendaftaran command
+local function registerCommand(name, func)
+    commandList[name] = func
+end
+
+
+
+
+
+
+-- ❌ /removeitem → Menghapus item di tangan (aktif)
+registerCommand("removeitem", function(pid)
+    if not hasPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin menggunakan /removeitem.", pid)
+        return
+    end
+
+    -- Cek item aktif
+    local err, itemid = Player:getCurToolID(pid)
+    if err ~= ErrorCode.OK or not itemid or itemid <= 0 then
+        Chat:sendSystemMsg("⚠ Tidak ada item di tangan untuk dihapus!", pid)
+        return
+    end
+
+    -- Hapus semua item dengan ID tersebut di bar shortcut (bartype=1)
+    local remErr, removedCount = Backpack:removeGridItemByItemID(pid, itemid, 999, 1)
+    if remErr == ErrorCode.OK then
+        Chat:sendSystemMsg("🗑️ Item ID " .. itemid .. " sebanyak " .. tostring(removedCount) .. " telah dihapus dari TAB aktif.", pid)
+    else
+        Chat:sendSystemMsg("❌ Gagal menghapus item (kode error: " .. tostring(remErr) .. ")", pid)
+    end
+end)
+
+-- 🆔 /id → Menampilkan ID item di tangan
+registerCommand("id", function(pid)
+    if not hasPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin menggunakan /id.", pid)
+        return
+    end
+    local err, itemid = Player:getCurToolID(pid)
+    if err ~= ErrorCode.OK or not itemid or itemid <= 0 then
+        Chat:sendSystemMsg("⚠ Tidak ada item di tangan!", pid)
+        return
+    end
+    Chat:sendSystemMsg("🆔 ID: " .. tostring(itemid), pid)
+end)
+
+
+-- ✏️ /setcount [jumlah] → Atur jumlah item di tangan
+registerCommand("setcount", function(pid, jumlah)
+    if not hasPermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak punya izin menggunakan /setcount.", pid)
+        return
+    end
+    local newCount = tonumber(jumlah)
+    if not newCount or newCount < 1 then
+        Chat:sendSystemMsg("⚠ Format salah! Gunakan: /setcount [jumlah]", pid)
+        return
+    end
+    local err, itemid = Player:getCurToolID(pid)
+    if err ~= ErrorCode.OK or not itemid or itemid <= 0 then
+        Chat:sendSystemMsg("⚠ Tidak ada item di tangan!", pid)
+        return
+    end
+    Backpack:removeGridItem(pid, 0)
+    local ok = Backpack:addItem(pid, itemid, newCount)
+    if ok then
+        Chat:sendSystemMsg("✅ Jumlah item di tangan sekarang: " .. newCount, pid)
+    else
+        Chat:sendSystemMsg("❌ Gagal menambahkan item baru!", pid)
+    end
+end)
+
+-- Chat parser
+ScriptSupportEvent:registerEvent("Player.NewInputContent", function(event)
+    local pid, msg = event.eventobjid, event.content
+    if not msg:find("^" .. commandPrefix) then return end
+
+    local parts = {}
+    for w in msg:gmatch("%S+") do table.insert(parts, w) end
+    local cmd = parts[1]:sub(2):lower()
+    table.remove(parts, 1)
+
+    local fn = commandList[cmd]
+    if fn then fn(pid, unpack(parts)) end
+end)
