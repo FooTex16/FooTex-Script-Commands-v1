@@ -20,6 +20,7 @@
 /setstealthspeed [nilai]   → Ubah kecepatan sembunyi     | Set stealth speed  
 /setswimspeed [nilai]      → Ubah kecepatan renang       | Set swim speed  
 /setjump [nilai]           → Ubah tinggi lompatan        | Set jump height  
+/killall                   → Kill semua player           | Kill all players
 
 
 💾 Attribute Profile Management
@@ -40,6 +41,8 @@
 /giveall [itemID] [jumlah]           → Beri item ke semua pemain   | Give item to all  
 /clearinv [barType]                  → Kosongkan bar tertentu      | Clear inventory (1=Shortcut, 2=Storage, 3=Armor)  
 /givehelp                            → Tampilkan bantuan give      | Show give command help  
+/give random                         → Give item random            | Give random item
+/give random [rangeid_1] [rangeid_2] → Give barang random range id | Give item random with range
 
 ✨ Fast Brick (new)
 /fastbrick                         → Aktifkan Fastbrick                | Activate Fastbrick 
