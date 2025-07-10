@@ -9,6 +9,18 @@ local commandList = {}
 -- Simpan daftar player terurut
 local playerIndexMap = {}
 
+function parsePlayerFromArg(arg)
+    if not arg then return nil end
+    local index = arg:match("^P%[(%d+)%]$")
+    if index then
+        local _, _, list = World:getAllPlayers(-1)
+        local n = tonumber(index)
+        return list[n]
+    end
+    return nametouid(arg)
+end
+
+
 -- Ambil UID dari nama atau angka atau P[nomor]
 local function nametouid(name)
     local _, _, list = World:getAllPlayers(-1)
@@ -48,15 +60,68 @@ local function registerCommand(name, func)
     commandList[name] = func
 end
 
+local VALID_ITEM_IDS = {}
+for i = 15000, 15100 do  -- Ganti dengan rentang ID item sah
+    VALID_ITEM_IDS[#VALID_ITEM_IDS+1] = i
+end
+
+
 -- 🎁 GIVE
-registerCommand("give", function(pid, itemid, qty, target)
+registerCommand("give", function(pid, arg1, arg2, arg3)
     if not hasGivePermission(pid) then
-        Chat:sendSystemMsg("🚫 Tidak ada izin /give.", pid)
+        Chat:sendSystemMsg("🚫 Kamu tidak punya izin menggunakan /give.", pid)
         return
     end
 
-    itemid = tonumber(itemid)
-    qty = math.min(tonumber(qty) or 1, MAX_GIVE)
+    -- ✨ /give random [minID] [maxID] ([target])
+    if arg1 == "random" then
+        local minID = tonumber(arg2)
+        local maxID = tonumber(arg3)
+        local targetArg = nil
+
+        if not minID or not maxID then
+            -- Mungkin ini: /give random 100 200 P[2]
+            minID = tonumber(arg2)
+            maxID = tonumber(arg3)
+            targetArg = arg4 or nil
+        end
+
+        if maxID and tostring(maxID):match("^P%[(%d+)%]$") then
+            targetArg = arg3
+            maxID = minID
+            minID = tonumber(arg2)
+        end
+
+        if not minID or not maxID or minID > maxID then
+            Chat:sendSystemMsg("⚠ Format: /give random [minID] [maxID] ([target])", pid)
+            return
+        end
+
+        local randomID = math.random(minID, maxID)
+        local name = Item:getItemName(randomID) or ("Item #" .. randomID)
+
+        -- 🔎 Target parsing
+        local targetPid = targetArg and parsePlayerFromArg(targetArg) or pid
+        if not targetPid then
+            Chat:sendSystemMsg("❌ Target tidak ditemukan.", pid)
+            return
+        end
+
+        local ok = Backpack:addItem(targetPid, randomID, 1)
+        if ok then
+            Chat:sendSystemMsg("🎁 Diberikan item acak *" .. name .. "* (ID: " .. randomID .. ")", targetPid)
+            if targetPid ~= pid then
+                Chat:sendSystemMsg("📤 Item acak *" .. name .. "* diberikan ke player lain.", pid)
+            end
+        else
+            Chat:sendSystemMsg("✖ Gagal memberi item.", pid)
+        end
+        return
+    end
+
+    -- 🔁 Default /give [itemID] [qty] ([target])
+    local itemid = tonumber(arg1)
+    local qty = math.min(tonumber(arg2) or 1, MAX_GIVE)
     if not itemid or qty < 1 then
         Chat:sendSystemMsg("⚠ Format: /give [itemID] [jumlah] ([target])", pid)
         return
@@ -68,9 +133,9 @@ registerCommand("give", function(pid, itemid, qty, target)
         return
     end
 
-    local tp = nametouid(target or "")
+    local tp = arg3 and parsePlayerFromArg(arg3) or pid
     if not tp then
-        Chat:sendSystemMsg("❌ Target tidak ditemukan: " .. tostring(target), pid)
+        Chat:sendSystemMsg("❌ Target tidak ditemukan!", pid)
         return
     end
 
@@ -84,6 +149,9 @@ registerCommand("give", function(pid, itemid, qty, target)
         Chat:sendSystemMsg("✖ Gagal memberi item.", pid)
     end
 end)
+
+
+
 
 
 -- 🎁 GIVEALL
