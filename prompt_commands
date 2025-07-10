@@ -41,6 +41,9 @@
 /clearinv [barType]                  → Kosongkan bar tertentu      | Clear inventory (1=Shortcut, 2=Storage, 3=Armor)  
 /givehelp                            → Tampilkan bantuan give      | Show give command help  
 
+✨ Fast Brick (new)
+/fastbrick                         → Aktifkan Fastbrick                | Activate Fastbrick 
+/resetbrick                        → Mereset Fastbrick menjadi normal  | Reset Fastbrick to normal   
 
 ✨ Permission Management
 /grantgive [nama/ID]                 → Beri izin /give             | Grant permission  
