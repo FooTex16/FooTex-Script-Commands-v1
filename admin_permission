@@ -4,7 +4,7 @@
 
 -- ✅ Daftar pemain dengan izin tetap (whitelist)
 PERMISSION_WHITELIST = {
-    ["DINA"] = true, -- Ganti dengan nama-nama yang diizinkan
+    ["DINA"] = true,
     ["Owner123"] = true
 }
 
@@ -14,21 +14,22 @@ MAX_GIVE = 99
 -- 🔧 Variabel command & izin dinamis
 commandPrefix = "/"
 commandList = {}
-givePermission = {} -- UID yang sudah diberi izin via /grantgive
+givePermission = {}            -- UID yang diberi izin sementara
+playerListIndexed = {}         -- Nomor ke UID, diisi oleh /listplayer
 
 -- 🔍 Fungsi: nama → UID
 function nametouid(name)
     local _, _, list = World:getAllPlayers(-1)
     for _, pid in ipairs(list) do
         local _, nick = Player:getNickname(pid)
-        if nick == name then
+        if nick == name or tostring(pid) == name then
             return pid
         end
     end
     return nil
 end
 
--- 🏆 Cek apakah host (jika isHost tidak tersedia)
+-- 🏆 Cek apakah host (fallback jika Player:isHost tidak tersedia)
 function isHost(pid)
     if Player.isHost then
         return Player:isHost(pid) == true
@@ -41,13 +42,13 @@ function isHost(pid)
     return pid == minPid
 end
 
--- 🔐 Cek apakah punya izin penuh
+-- 🔐 Cek apakah memiliki izin penuh
 function hasGivePermission(pid)
     local _, name = Player:getNickname(pid)
     return isHost(pid) or givePermission[pid] or PERMISSION_WHITELIST[name] == true
 end
 
--- ✅ Fungsi global agar bisa dibaca script lain
+-- ✅ Fungsi global (akses dari luar)
 function isPermitted(pid)
     local _, name = Player:getNickname(pid)
     return isHost(pid) or givePermission[pid] or PERMISSION_WHITELIST[name] == true
@@ -59,20 +60,15 @@ end
 
 function getAllPermittedNames()
     local permittedNames = {}
-
-    -- Dari whitelist
     for name, _ in pairs(PERMISSION_WHITELIST) do
         table.insert(permittedNames, name)
     end
-
-    -- Dari UID yang diberikan izin
     for uid, _ in pairs(givePermission) do
         local _, name = Player:getNickname(uid)
         if name then
             table.insert(permittedNames, name)
         end
     end
-
     return permittedNames
 end
 
@@ -85,14 +81,36 @@ end
 -- 📜 COMMANDS: GRANT / REVOKE / LIST / HOST
 -- =============================================
 
--- Beri izin /give
+-- 🧾 Tampilkan daftar pemain sebagai nomor
+registerCommand("listplayer", function(pid)
+    local _, _, list = World:getAllPlayers(-1)
+    playerListIndexed = {}
+    Chat:sendSystemMsg("📋 Daftar Pemain:", pid)
+    for i, p in ipairs(list) do
+        local _, name = Player:getNickname(p)
+        playerListIndexed[i] = p
+        Chat:sendSystemMsg("[" .. i .. "] " .. name .. " (" .. p .. ")", pid)
+    end
+    Chat:sendSystemMsg("ℹ Gunakan: /grantgive P[1] untuk beri izin ke pemain no 1", pid)
+end)
+
+-- 🎯 Ambil pid dari "P[1]" atau nama
+function getPidFromPX(str)
+    local num = str:match("^P%[(%d+)%]$")
+    if num then
+        local index = tonumber(num)
+        return playerListIndexed[index]
+    end
+    return tonumber(str) or nametouid(str)
+end
+
+-- ✅ Grant izin /give
 registerCommand("grantgive", function(pid, target)
-    local _, name = Player:getNickname(pid)
-    if not (isHost(pid) or PERMISSION_WHITELIST[name]) then
-        Chat:sendSystemMsg("⛔ Hanya host atau whitelist yang bisa memberikan izin.", pid)
+    if not hasGivePermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak bisa memberi izin.", pid)
         return
     end
-    local tp = tonumber(target) or nametouid(target)
+    local tp = getPidFromPX(target)
     if not tp then
         Chat:sendSystemMsg("❌ Target tidak ditemukan!", pid)
         return
@@ -102,24 +120,23 @@ registerCommand("grantgive", function(pid, target)
     Chat:sendSystemMsg("📜 Kamu sekarang memiliki izin /give.", tp)
 end)
 
--- Cabut izin /give
-registerCommand("revoke", function(pid, target)
-    local _, name = Player:getNickname(pid)
-    if not (isHost(pid) or PERMISSION_WHITELIST[name]) then
-        Chat:sendSystemMsg("⛔ Hanya host atau whitelist yang bisa mencabut izin.", pid)
+-- ❌ Cabut izin /give
+registerCommand("revokeperm", function(pid, target)
+    if not hasGivePermission(pid) then
+        Chat:sendSystemMsg("⛔ Kamu tidak bisa mencabut izin.", pid)
         return
     end
-    local tp = tonumber(target) or nametouid(target)
+    local tp = getPidFromPX(target)
     if not tp then
         Chat:sendSystemMsg("❌ Target tidak ditemukan!", pid)
         return
     end
     givePermission[tp] = nil
-    Chat:sendSystemMsg("⛔ Izin /give dicabut.", pid)
-    Chat:sendSystemMsg("❌ Kamu tidak lagi memiliki izin /give.", tp)
+    Chat:sendSystemMsg("🚫 Izin dicabut dari pemain.", pid)
+    Chat:sendSystemMsg("⛔ Kamu tidak lagi memiliki izin /give.", tp)
 end)
 
--- Daftar pemain yang punya izin
+-- 📝 Lihat daftar semua pemain yang punya izin
 registerCommand("listperm", function(pid)
     Chat:sendSystemMsg("🧾 Pemain dengan izin /give:", pid)
     for uid, _ in pairs(givePermission) do
@@ -133,7 +150,7 @@ registerCommand("listperm", function(pid)
     end
 end)
 
--- Cek apakah kamu host
+-- ✅ Cek apakah host
 registerCommand("amihost", function(pid)
     if isHost(pid) then
         Chat:sendSystemMsg("✅ Kamu adalah host!", pid)
@@ -153,8 +170,7 @@ end
 ScriptSupportEvent:registerEvent("Player.NewInputContent", function(event)
     local pid = event.eventobjid
     local msg = event.content
-
-    if msg:sub(1, 1) ~= "/" then return end -- hanya command
+    if msg:sub(1, 1) ~= "/" then return end
 
     local args = {}
     for word in msg:gmatch("%S+") do
