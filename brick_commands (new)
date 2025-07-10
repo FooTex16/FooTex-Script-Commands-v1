@@ -1,0 +1,92 @@
+-- =============================================
+-- 🧱 FASTBRICK CLEAN + AUTO HAPUS ITEM DROP
+-- =============================================
+
+-- ✅ Daftar admin (nama persis pemain)
+local ADMIN_WHITELIST = {
+    ["DINA"] = true,
+    ["Owner123"] = true,
+    ["Virtus"] = true
+}
+
+-- 🔍 Cek admin
+local function isAdmin(pid)
+    local _, name = Player:getNickname(pid)
+    return ADMIN_WHITELIST[name] == true
+end
+
+-- 🗂️ Status FastBrick per player
+local fastBrickPlayers = {}
+local fastBrickCleanMode = {}
+
+-- ✅ Aktifkan FastBrick
+local function enableFastBrick(pid, clean)
+    fastBrickPlayers[pid] = true
+    fastBrickCleanMode[pid] = clean
+    if clean then
+        Chat:sendSystemMsg("🧱 Fast Brick (Clean Mode) aktif! Drop item akan dihapus otomatis.", pid)
+    else
+        Chat:sendSystemMsg("🧱 Fast Brick aktif! Block hancur dengan drop item.", pid)
+    end
+end
+
+-- ❎ Nonaktifkan
+local function disableFastBrick(pid)
+    fastBrickPlayers[pid] = false
+    fastBrickCleanMode[pid] = false
+    Chat:sendSystemMsg("⛔ Fast Brick dimatikan.", pid)
+end
+
+-- 🧹 Hapus item drop yang muncul di lokasi tertentu
+local function removeNearbyDrop(x, y, z)
+    -- Radius kecil karena kita hanya ingin hapus item dari block barusan
+    local itemList = World:getAllDropItemsAroundPos(x, y, z, 1)
+    for _, iid in ipairs(itemList or {}) do
+        Item:removeItem(iid)
+    end
+end
+
+-- 💥 Saat klik block
+ScriptSupportEvent:registerEvent("Player.ClickBlock", function(event)
+    local pid = event.eventobjid
+    if fastBrickPlayers[pid] then
+        local x, y, z = event.x, event.y, event.z
+        -- Selalu hancurkan block dengan drop ON
+        Block:destroyBlock(x, y, z, 1)
+        
+        -- Jika clean mode, hapus drop item segera setelah muncul
+        if fastBrickCleanMode[pid] then
+            Game:runLater(function()
+                removeNearbyDrop(x, y, z)
+            end, 0.1) -- 0.1 detik delay
+        end
+    end
+end)
+
+-- 🎧 Chat commands
+ScriptSupportEvent:registerEvent("Player.NewInputContent", function(event)
+    local pid = event.eventobjid
+    local msg = event.content:lower()
+
+    if msg == "/fastbrick" then
+        if not isAdmin(pid) then
+            Chat:sendSystemMsg("⛔ Kamu tidak punya izin menggunakan /fastbrick.", pid)
+            return
+        end
+        enableFastBrick(pid, false)
+
+    elseif msg == "/fastbrick clean" then
+        if not isAdmin(pid) then
+            Chat:sendSystemMsg("⛔ Kamu tidak punya izin menggunakan /fastbrick clean.", pid)
+            return
+        end
+        enableFastBrick(pid, true)
+
+    elseif msg == "/resetbrick" then
+        if not isAdmin(pid) then
+            Chat:sendSystemMsg("⛔ Kamu tidak punya izin menggunakan /resetbrick.", pid)
+            return
+        end
+        disableFastBrick(pid)
+    end
+end)
