@@ -10,6 +10,7 @@ local saved_locations = {}
 local loopGotoID = {}
 local loopBring = {}
 local loopTpPairs = {}
+local playerList = {}
 
 -- ✅ Cek izin teleport berdasarkan isPermitted (dari admin_permission.lua)
 local function hasTeleportPermission(pid)
@@ -21,17 +22,33 @@ local function hasTeleportPermission(pid)
     end
 end
 
--- 🔍 Ambil UID dari nama atau angka
+
+
+-- 🔍 Ambil UID dari nama, ID, atau P[angka]
 local function nametouid(name)
-    local _,_, list = World:getAllPlayers(-1)
+    local _, _, list = World:getAllPlayers(-1)
+    playerIndexMap = {}
+    for i, pid in ipairs(list) do
+        playerIndexMap[i] = pid
+    end
+
+    if name and name:match("^P%[(%d+)%]$") then
+        local idx = tonumber(name:match("^P%[(%d+)%]$"))
+        return playerIndexMap[idx]
+    end
+
     for _, pid in ipairs(list) do
         local _, nick = Player:getNickname(pid)
         if nick == name or tostring(pid) == name then
             return pid
         end
     end
+
     return nil
 end
+
+
+
 
 -- 🎯 Efek teleportasi
 local TP_EFFECT = 1001
@@ -85,6 +102,7 @@ registerCommand("goto", function(pid, arg)
         teleport(pid, x, y, z)
     end
 end)
+
 
 -- 📦 TPALL
 registerCommand("tpall", function(pid, arg)
