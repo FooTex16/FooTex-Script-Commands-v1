@@ -4,13 +4,17 @@
 
 -- ✅ Daftar pemain dengan izin tetap (whitelist)
 PERMISSION_WHITELIST = {
-    ["Player1"] = true, --Your Player Name
+    ["DINA"] = true, -- Ganti dengan nama-nama yang diizinkan
+    ["Owner123"] = true
 }
 
+-- 📌 Batas maksimal pemberian item
 MAX_GIVE = 99
+
+-- 🔧 Variabel command & izin dinamis
 commandPrefix = "/"
 commandList = {}
-givePermission = {}
+givePermission = {} -- UID yang sudah diberi izin via /grantgive
 
 -- 🔍 Fungsi: nama → UID
 function nametouid(name)
@@ -24,7 +28,7 @@ function nametouid(name)
     return nil
 end
 
--- 🏆 Cek apakah host (fallback: PID terkecil)
+-- 🏆 Cek apakah host (jika isHost tidak tersedia)
 function isHost(pid)
     if Player.isHost then
         return Player:isHost(pid) == true
@@ -37,13 +41,42 @@ function isHost(pid)
     return pid == minPid
 end
 
--- 🔐 Cek apakah punya izin
+-- 🔐 Cek apakah punya izin penuh
 function hasGivePermission(pid)
     local _, name = Player:getNickname(pid)
     return isHost(pid) or givePermission[pid] or PERMISSION_WHITELIST[name] == true
 end
 
--- 🔧 Daftarkan command
+-- ✅ Fungsi global agar bisa dibaca script lain
+function isPermitted(pid)
+    local _, name = Player:getNickname(pid)
+    return isHost(pid) or givePermission[pid] or PERMISSION_WHITELIST[name] == true
+end
+
+function isPermittedByName(name)
+    return PERMISSION_WHITELIST[name] == true
+end
+
+function getAllPermittedNames()
+    local permittedNames = {}
+
+    -- Dari whitelist
+    for name, _ in pairs(PERMISSION_WHITELIST) do
+        table.insert(permittedNames, name)
+    end
+
+    -- Dari UID yang diberikan izin
+    for uid, _ in pairs(givePermission) do
+        local _, name = Player:getNickname(uid)
+        if name then
+            table.insert(permittedNames, name)
+        end
+    end
+
+    return permittedNames
+end
+
+-- 🔧 Pendaftaran command
 function registerCommand(name, func)
     commandList[name] = func
 end
@@ -52,6 +85,7 @@ end
 -- 📜 COMMANDS: GRANT / REVOKE / LIST / HOST
 -- =============================================
 
+-- Beri izin /give
 registerCommand("grantgive", function(pid, target)
     local _, name = Player:getNickname(pid)
     if not (isHost(pid) or PERMISSION_WHITELIST[name]) then
@@ -68,6 +102,7 @@ registerCommand("grantgive", function(pid, target)
     Chat:sendSystemMsg("📜 Kamu sekarang memiliki izin /give.", tp)
 end)
 
+-- Cabut izin /give
 registerCommand("revoke", function(pid, target)
     local _, name = Player:getNickname(pid)
     if not (isHost(pid) or PERMISSION_WHITELIST[name]) then
@@ -84,17 +119,21 @@ registerCommand("revoke", function(pid, target)
     Chat:sendSystemMsg("❌ Kamu tidak lagi memiliki izin /give.", tp)
 end)
 
+-- Daftar pemain yang punya izin
 registerCommand("listperm", function(pid)
     Chat:sendSystemMsg("🧾 Pemain dengan izin /give:", pid)
     for uid, _ in pairs(givePermission) do
         local _, name = Player:getNickname(uid)
-        Chat:sendSystemMsg("✅ " .. name .. " (" .. uid .. ")", pid)
+        if name then
+            Chat:sendSystemMsg("✅ " .. name .. " (" .. uid .. ")", pid)
+        end
     end
     for name, _ in pairs(PERMISSION_WHITELIST) do
         Chat:sendSystemMsg("🔒 Whitelist: " .. name, pid)
     end
 end)
 
+-- Cek apakah kamu host
 registerCommand("amihost", function(pid)
     if isHost(pid) then
         Chat:sendSystemMsg("✅ Kamu adalah host!", pid)
@@ -104,10 +143,9 @@ registerCommand("amihost", function(pid)
 end)
 
 -- =============================================
--- 💬 CHAT PARSER UNTUK COMMAND
+-- 💬 CHAT PARSER UNTUK COMMAND (EVENT)
 -- =============================================
 
--- Kompatibilitas: jika Lua lama tidak punya `unpack`, pakai versi global
 if not unpack and table.unpack then
     unpack = table.unpack
 end
@@ -127,6 +165,6 @@ ScriptSupportEvent:registerEvent("Player.NewInputContent", function(event)
     local func = commandList[cmd]
     if func then
         table.remove(args, 1)
-        func(pid, unpack(args)) -- ✅ fix error unpack
+        func(pid, unpack(args))
     end
 end)
